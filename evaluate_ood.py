@@ -19,7 +19,7 @@ from train_net import Trainer, setup
 from detectron2.checkpoint import DetectionCheckpointer
 from pprint import pprint
 from support import get_datasets, OODEvaluator
-
+from torchvision.transforms.functional import resize
 from easydict import EasyDict as edict
 
 parser = argparse.ArgumentParser(description='OOD Evaluation')
@@ -139,7 +139,25 @@ def get_logits(model, x, **kwargs):
 
     return out[0]['sem_seg'].unsqueeze(0)
 
+def get_maskomaly(model, x, **kwargs):
+    with torch.no_grad():
+        segmentation, mask_cls_result, mask_pred_result = model([{"image": x[0].to(DEVICE)}])
+        energy = mask_cls_result.logsumexp(1)
+        mask_cls_score = F.softmax(mask_cls_result, 1)
+        masks = mask_pred_result.sigmoid()
+        scores = torch.ones_like(masks[0])
+        high_energy_indices = torch.where(energy > torch.quantile(energy, 0.7))[0]
 
+
+        for idx in high_energy_indices:
+            if mask_cls_score[idx].argmax() != 19:
+                # print(scores.shape)
+                # print(mask_cls_score[idx].max())
+                # print(scores.shape, 10*"$",mask_cls_score[idx].max()[0], 10*"#" )
+                scores = torch.minimum(scores, 1 - masks[idx] * mask_cls_score[idx].max())
+
+    scores = resize(scores.unsqueeze(0).unsqueeze(0), [720,1280]).squeeze().squeeze()
+    return scores
 def get_RbA(model, x, **kwargs):
     
     with torch.no_grad():

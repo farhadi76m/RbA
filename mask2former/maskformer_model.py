@@ -353,7 +353,7 @@ class MaskFormer(nn.Module):
             if return_separately:
                 return processed_results, mask_cls_result, mask_pred_result
 
-            return processed_results
+            return processed_results,  mask_cls_result, mask_pred_result
 
     def prepare_targets(self, targets, images, outlier_masks=None, sem_seg=None):
         h_pad, w_pad = images.tensor.shape[-2:]
